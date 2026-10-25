@@ -122,7 +122,7 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=5 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "false").lower() == "true",
+        SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "true").lower() == "true",
         UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", str(BASE_DIR / "uploads")),
         JSON_SORT_KEYS=False,
     )
@@ -331,12 +331,11 @@ def create_app(test_config=None):
             if not item.product.active or item.quantity > item.product.inventory:
                 return jsonify(error=f"inventory_unavailable_for_{item.product.id}"), 409
             subtotal += item.product.price_cents * item.quantity
-        shipping = int(data.get("shipping_cents", 1090))
+        shipping = 1090
         tax = round(subtotal * 0.0825)
-        order = Order(customer_id=user.id, status="paid", subtotal_cents=subtotal, shipping_cents=shipping, tax_cents=tax, total_cents=subtotal + shipping + tax, shipping_address=address)
+        order = Order(customer_id=user.id, status="pending", subtotal_cents=subtotal, shipping_cents=shipping, tax_cents=tax, total_cents=subtotal + shipping + tax, shipping_address=address)
         db.session.add(order)
         for item in items:
-            item.product.inventory -= item.quantity
             order.items.append(OrderItem(product_id=item.product_id, seller_id=item.product.store.seller_id, product_name=item.product.name, quantity=item.quantity, unit_price_cents=item.product.price_cents))
             db.session.delete(item)
         db.session.commit()
@@ -361,8 +360,9 @@ def create_app(test_config=None):
             return jsonify(error="not_found"), 404
         if order.status not in {"pending", "paid"} and user.role != "admin":
             return jsonify(error="order_cannot_be_cancelled"), 409
+        was_paid = order.status == "paid"
         order.status = "cancelled"
-        if user.role == "admin" or order.customer_id == user.id:
+        if was_paid and (user.role == "admin" or order.customer_id == user.id):
             for item in order.items:
                 product = db.session.get(Product, item.product_id)
                 if product:
@@ -379,6 +379,8 @@ def create_app(test_config=None):
         owned = [item for item in order.items if user.role == "admin" or item.seller_id == user.id]
         if not owned:
             return jsonify(error="forbidden"), 403
+        if order.status not in {"paid", "partially_fulfilled"}:
+            return jsonify(error="payment_required"), 409
         for item in owned:
             item.fulfillment_status = "fulfilled"
         order.status = "fulfilled" if all(i.fulfillment_status == "fulfilled" for i in order.items) else "partially_fulfilled"

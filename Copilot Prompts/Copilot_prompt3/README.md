@@ -12,10 +12,13 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 $env:ADMIN_EMAIL="admin@example.com"
 $env:ADMIN_PASSWORD="use-a-long-unique-password"
+$env:COOKIE_SECURE="false"
 python app.py
 ```
 
 Open `http://127.0.0.1:5000`. Set `COOKIE_SECURE=true` behind HTTPS. For production use PostgreSQL by setting `DATABASE_URL` to a psycopg connection string and serve with the included Gunicorn command or Docker Compose.
+
+The example enables secure cookies by default. For local HTTP-only development, set `COOKIE_SECURE=false` in `.env`; never use that setting for a public or HTTPS deployment. Docker Compose requires a unique `POSTGRES_PASSWORD` supplied through `.env` or the deployment environment. Do not use an empty or shared password.
 
 ## Security notes
 
@@ -24,6 +27,7 @@ Open `http://127.0.0.1:5000`. Set `COOKIE_SECURE=true` behind HTTPS. For product
 - Seller and customer routes enforce ownership server-side. Uploads use generated filenames, allowlisted extensions, and a 5 MB request limit.
 - Production deployment must place the service behind TLS, rotate `SECRET_KEY`, use a managed secrets store, restrict database access, configure backups, scan dependencies, add an external rate-limit store, and use object storage plus malware/content scanning for uploads.
 - The shipping endpoint is a transparent UPS-style dimensional-weight/zone estimate, not an official UPS quote. Integrate UPS OAuth/API credentials for live rates and labels.
+- Checkout creates a pending order with a server-selected $10.90 shipping estimate. The app has no payment provider or payment-verification callback: pending orders do not reduce inventory and cannot be fulfilled. Integrate trusted payment verification before transitioning an order to `paid`; the payment-success handler must also recheck and reserve/decrement available inventory atomically. Do not mark orders paid based on client input.
 
 ## Main endpoints
 

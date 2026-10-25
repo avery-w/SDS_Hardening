@@ -17,14 +17,22 @@ UPLOAD_FOLDER = BASE_DIR / os.environ.get("UPLOAD_FOLDER", "uploads")
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 MAX_TEXT = 500
 UPS_ORIGIN = "110 Inner Campus Drive, Austin, TX 78705"
+APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
+SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
+
+if APP_ENV not in {"development", "production"}:
+    raise RuntimeError("APP_ENV must be either 'development' or 'production'")
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("Set SECRET_KEY to a random value of at least 32 characters")
 
 app = Flask(__name__)
 app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY", "development-only-change-me"),
+    SECRET_KEY=SECRET_KEY,
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,
     UPLOAD_FOLDER=str(UPLOAD_FOLDER),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=APP_ENV == "production",
 )
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
@@ -128,12 +136,27 @@ def initialize_database() -> None:
         db = get_db()
         schema = (BASE_DIR / "schema.sql").read_text(encoding="utf-8")
         db.executescript(schema)
+        demo_emails = ("customer@example.com", "seller@example.com", "admin@example.com")
+        if APP_ENV == "production" and query_one(
+            "SELECT id FROM users WHERE active = 1 AND email IN (?, ?, ?) LIMIT 1",
+            demo_emails,
+        ):
+            raise RuntimeError(
+                "The database contains active demo accounts; remove or replace them before production startup"
+            )
         if query_one("SELECT id FROM users LIMIT 1"):
             return
+        if APP_ENV != "development":
+            return
+        demo_password = os.environ.get("DEMO_PASSWORD", "")
+        if len(demo_password) < 12:
+            raise RuntimeError(
+                "Set DEMO_PASSWORD to at least 12 characters to seed development demo accounts"
+            )
         users = [
-            ("Demo Customer", "customer@example.com", "customer", "password123"),
-            ("Demo Seller", "seller@example.com", "seller", "password123"),
-            ("Platform Admin", "admin@example.com", "admin", "password123"),
+            ("Demo Customer", "customer@example.com", "customer", demo_password),
+            ("Demo Seller", "seller@example.com", "seller", demo_password),
+            ("Platform Admin", "admin@example.com", "admin", demo_password),
         ]
         for name, email, role, password in users:
             db.execute(

@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_DB: marketplace
       POSTGRES_USER: marketplace
-      POSTGRES_PASSWORD: change-this-in-production
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a unique POSTGRES_PASSWORD in .env or the deployment environment}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 volumes:

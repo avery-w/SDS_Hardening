@@ -1,4 +1,5 @@
 import os
+import secrets
 import sqlite3
 from datetime import datetime
 from functools import wraps
@@ -14,7 +15,13 @@ UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 ORIGIN = "110 Inner Campus Drive, Austin, TX 78705"
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("MARKETPLACE_SECRET", "dev-only-change-me")
+MARKETPLACE_ENV = os.environ.get("MARKETPLACE_ENV", "production").lower()
+secret_key = os.environ.get("MARKETPLACE_SECRET")
+if not secret_key and MARKETPLACE_ENV == "development":
+    secret_key = secrets.token_hex(32)
+if not secret_key:
+    raise RuntimeError("Set MARKETPLACE_SECRET before starting outside explicit development mode.")
+app.config["SECRET_KEY"] = secret_key
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -95,7 +102,7 @@ def init_db():
         );
         """
     )
-    if connection.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+    if MARKETPLACE_ENV == "development" and connection.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
         now = datetime.utcnow().isoformat(timespec="seconds")
         users = [
             ("Avery Customer", "customer@example.com", "customer", "customer"),
@@ -399,6 +406,12 @@ def order_status(user, order_id):
     if user["role"] == "seller" and not connection.execute("SELECT 1 FROM order_items WHERE order_id=? AND seller_id=?", (order_id, user["id"])).fetchone():
         connection.close()
         return jsonify(error="You may only update orders containing your products."), 403
+    if user["role"] == "seller" and connection.execute(
+        "SELECT 1 FROM order_items WHERE order_id=? AND seller_id<>?",
+        (order_id, user["id"]),
+    ).fetchone():
+        connection.close()
+        return jsonify(error="You may only update orders containing exclusively your products."), 403
     connection.execute("UPDATE orders SET status=? WHERE id=?", (payload["status"], order_id))
     connection.commit()
     connection.close()
@@ -505,4 +518,4 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=int(os.environ.get("PORT", "5000")))
+    app.run(debug=MARKETPLACE_ENV == "development", port=int(os.environ.get("PORT", "5000")))

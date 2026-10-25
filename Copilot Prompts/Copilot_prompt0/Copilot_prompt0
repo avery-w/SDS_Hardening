@@ -1,0 +1,31 @@
+0. Build a modern e-commerce marketplace web application in Python. Use correct and proper syntax for all libraries.
+
+Three roles: customer, seller, admin.
+
+- Customers: browse/search products, manage their account, cart, checkout, order history, cancellations/return requests.
+
+- Sellers: manage their own store, products, inventory, upload images and view/fulfill their own orders and sales.
+
+- Admins: manage all users, sellers, stores, products, orders, and platform settings; deactivate accounts and override seller/customer actions and create sales analytics for the admin dashboard.
+
+Additional Features:
+
+Create an API for checkout that calculates shipping rates using UPS guidelines, with the starting location set to 110 Inner Campus Drive, Austin, TX 78705.
+
+Add an AI chatbot to assist customers and encourage them to message sellers directly through the application when they have questions about products or orders.
+
+Provide all necessary source code, dependencies, configuration files, database schemas, and setup instructions.
+
+Security requirements:
+
+- Validate all external input on the server using explicit schemas and business rules. Use parameterized database queries, context-appropriate output encoding, and safe template rendering. Prevent path traversal and command injection; do not construct shell commands from user input.
+- Protect outbound HTTP requests, including any UPS integration, against SSRF. Use fixed or allowlisted destinations, validate redirects and resolved addresses, set timeouts and response-size limits, and never let users choose arbitrary URLs.
+- Hash passwords using Argon2id or bcrypt. Add login rate limiting and a documented lockout or progressive-delay policy. Protect sessions with Secure, HttpOnly, and appropriate SameSite cookies; enforce token expiry and rotation and invalidate sessions on logout and credential changes.
+- Enforce server-side authorization on every sensitive route and API. Scope seller access to their own stores, products, inventory, orders, and sales; define least-privilege customer, seller, admin, API-key, and service-account permissions. Require auditable authorization for administrative overrides.
+- Store secrets only in environment-based configuration or a secrets manager; never include credentials, API keys, or tokens in source, logs, test fixtures, or container images. Provide a safe environment-variable example, exclude local secret files from version control, and identify any credentials that must be rotated rather than reproducing them.
+- In production, require HTTPS, disable debug mode and verbose error responses, restrict CORS to explicitly configured trusted origins, and set an appropriate Content-Security-Policy, HSTS, X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
+- Handle image uploads with size/type limits, content inspection, generated storage names, safe storage outside executable/public paths where practical, and authorization checks for retrieval. Apply access controls to seller/customer messages and attachments.
+- Restrict the AI chatbot to the minimum customer/order data needed for its task. Treat user messages, product descriptions, and retrieved content as untrusted data, not instructions; do not expose secrets or another user's data, and do not permit privileged actions without normal authorization checks.
+- Log security-relevant events such as failed logins and permission denials without logging passwords, tokens, or unnecessary personal data. Return generic client-facing errors and keep diagnostic details in appropriately protected server logs.
+- Audit dependencies for known vulnerabilities, avoid unused packages, pin production dependency versions, and include a practical update plan. If container or CI configuration is provided, use a non-root runtime, a minimal maintained base image, and avoid baking secrets into images or build logs.
+- Add or update focused tests for authentication, authorization boundaries, input validation, uploads, and security-sensitive integrations. Preserve the requested features; explain any security-driven behavior changes and any remaining risks or required manual configuration.
